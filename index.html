@@ -707,22 +707,20 @@
   function construireRapportTexte() {
     var ev = donnees.evenements.find(function (e) { return e.id === evenementActifId; });
     var lignes = getParticipationsEvenement(evenementActifId);
-    var basesConnues = construireBasesConnues(evenementActifId);
-
-    function libelle(l) {
-      var emp = regrouperEmplacements(l.participation.emplacements, basesConnues);
-      return (emp ? emp + " — " : "") + l.exposant.entreprise;
-    }
 
     var presents = lignes.filter(function (l) { return estPresent(l.exposant.id); });
     var absents = lignes.filter(function (l) { return !estPresent(l.exposant.id); });
+
+    function listePuces(liste) {
+      return liste.length ? liste.map(function (l) { return "- " + l.exposant.entreprise; }).join("\n") : "- (aucun)";
+    }
 
     var sujet = "Rapport de présence — " + ev.nom + " (" + formatDateFr(ev.date_evenement) + ")";
     var corps = "Rapport de présence\n" + ev.nom + " — " + formatDateFr(ev.date_evenement) +
       (ev.lieu ? " — " + ev.lieu : "") + "\n" +
       presents.length + " présent(s) / " + absents.length + " absent(s) / " + lignes.length + " attendu(s)\n\n";
-    corps += "Présent : " + (presents.length ? presents.map(libelle).join(", ") : "—") + "\n\n";
-    corps += "Absent : " + (absents.length ? absents.map(libelle).join(", ") : "—") + "\n";
+    corps += "Présents :\n" + listePuces(presents) + "\n\n";
+    corps += "Absents :\n" + listePuces(absents) + "\n";
 
     return { sujet: sujet, corps: corps, nbLignes: lignes.length };
   }
