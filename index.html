@@ -127,9 +127,9 @@
   li.exp-row .checkbox.unchecked { background: var(--red-bg); border-color: var(--red); color: var(--red); }
   li.exp-row .info { flex: 1; min-width: 0; cursor: pointer; }
   li.exp-row .info .nom { font-weight: 700; font-size: 15px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  li.exp-row .info .emp { font-size: 13px; color: var(--muted); margin-top: 1px; }
+  li.exp-row .info .emp { font-size: 14px; color: var(--navy-light); font-weight: 700; margin-top: 2px; }
   li.exp-row .chevron { color: var(--line); font-size: 18px; flex-shrink: 0; }
-  li.exp-row.is-absent .info .nom { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--red); }
+  li.exp-row.is-absent .info .nom { color: var(--muted); }
 
   .pin { display: inline-block; background: var(--navy); color: white; font-size: 11.5px; font-weight: 700;
         padding: 2px 7px; border-radius: 6px; margin-right: 4px; }
@@ -428,6 +428,7 @@
     document.querySelectorAll(".screen").forEach(function (s) { s.classList.remove("active"); });
     $(id).classList.add("active");
     $("btn-back").style.display = (id === "screen-dashboard") ? "none" : "flex";
+    if (id === "screen-dashboard" && donnees) rendreStatsDashboard();
   }
 
   function allerA(id) {
