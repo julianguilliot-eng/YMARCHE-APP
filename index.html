@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Ymarché — Jour de marché</title>
+<style>
+  :root {
+    --navy: #17324a;
+    --navy-light: #22496a;
+    --orange: #e0672a;
+    --orange-dark: #c8501a;
+    --cream: #f6f3ec;
+    --card: #ffffff;
+    --line: #e4ddd0;
+    --text: #2a2622;
+    --muted: #756f64;
+    --green: #1f7a4d;
+    --green-bg: #e6f4ec;
+    --red: #b3261e;
+    --red-bg: #fbeae9;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--cream);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #app { min-height: 100%; display: flex; flex-direction: column; }
+
+  header.topbar {
+    background: var(--navy);
+    color: white;
+    padding: 16px 18px 14px;
+    display: flex; align-items: center; gap: 10px;
+    position: sticky; top: 0; z-index: 10;
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
+  }
+  header.topbar .back {
+    background: rgba(255,255,255,.12); border: none; color: white;
+    width: 36px; height: 36px; border-radius: 10px; font-size: 18px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    flex-shrink: 0;
+  }
+  header.topbar .title-block { flex: 1; min-width: 0; }
+  header.topbar h1 { font-size: 17px; margin: 0; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  header.topbar .subtitle { font-size: 12.5px; color: rgba(255,255,255,.65); margin-top: 1px; }
+
+  main { flex: 1; padding: 16px 16px 32px; }
+  .screen { display: none; }
+  .screen.active { display: block; animation: fadein .18s ease; }
+  @keyframes fadein { from { opacity: 0; transform: translateY(4px);} to { opacity:1; transform: none; } }
+
+  .card {
+    background: var(--card); border-radius: var(--radius);
+    padding: 18px; margin-bottom: 14px;
+    box-shadow: 0 1px 3px rgba(23,50,74,.08);
+    border: 1px solid var(--line);
+  }
+  .card h2 { margin: 0 0 4px; font-size: 15px; color: var(--navy); }
+  .card p.hint { margin: 0 0 12px; color: var(--muted); font-size: 13.5px; line-height: 1.45; }
+
+  .btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; padding: 14px 16px; border: none; border-radius: 12px;
+    font-size: 15.5px; font-weight: 600; cursor: pointer;
+    -webkit-appearance: none; text-decoration: none;
+  }
+  .btn-primary { background: var(--orange); color: white; }
+  .btn-primary:active { background: var(--orange-dark); }
+  .btn-navy { background: var(--navy); color: white; }
+  .btn-navy:active { background: var(--navy-light); }
+  .btn-ghost { background: var(--cream); color: var(--navy); border: 1px solid var(--line); }
+  .btn-ghost:active { background: #ece6d8; }
+  .btn-sm { padding: 9px 12px; font-size: 13.5px; width: auto; }
+  .btn + .btn { margin-top: 10px; }
+  .btn-row { display: flex; gap: 10px; }
+  .btn-row .btn { margin-top: 0; }
+  .btn[disabled] { opacity: .45; pointer-events: none; }
+
+  select, input[type=text] {
+    width: 100%; padding: 12px 14px; border-radius: 10px;
+    border: 1px solid var(--line); background: white; font-size: 15px;
+    color: var(--text); font-family: inherit;
+  }
+  label.field-label { display: block; font-size: 13px; font-weight: 600; color: var(--navy); margin-bottom: 6px; }
+
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); }
+  .empty-state .emoji { font-size: 40px; display: block; margin-bottom: 10px; }
+
+  #file-input { display: none; }
+
+  .stat-row { display: flex; gap: 10px; margin-bottom: 14px; }
+  .stat-box {
+    flex: 1; background: var(--card); border-radius: 12px; padding: 12px 8px;
+    text-align: center; border: 1px solid var(--line);
+  }
+  .stat-box .num { font-size: 22px; font-weight: 800; color: var(--navy); line-height: 1.1; }
+  .stat-box .lbl { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .stat-box.present .num { color: var(--green); }
+  .stat-box.absent .num { color: var(--red); }
+
+  .search-bar { position: relative; margin-bottom: 12px; }
+  .search-bar input {
+    padding-left: 38px;
+  }
+  .search-bar .icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+
+  .quick-actions { display: flex; gap: 10px; margin-bottom: 14px; }
+  .quick-actions .btn { flex: 1; }
+
+  ul.exp-list { list-style: none; margin: 0; padding: 0; }
+  li.exp-row {
+    background: var(--card); border-radius: 12px; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 12px; padding: 12px 12px;
+    border: 1px solid var(--line);
+  }
+  li.exp-row .checkbox {
+    width: 30px; height: 30px; border-radius: 9px; border: 2px solid var(--line);
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 17px; color: white; cursor: pointer; transition: background .12s, border-color .12s;
+  }
+  li.exp-row .checkbox.checked { background: var(--green); border-color: var(--green); }
+  li.exp-row .checkbox.unchecked { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+  li.exp-row .info { flex: 1; min-width: 0; cursor: pointer; }
+  li.exp-row .info .nom { font-weight: 700; font-size: 15px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  li.exp-row .info .emp { font-size: 13px; color: var(--muted); margin-top: 1px; }
+  li.exp-row .chevron { color: var(--line); font-size: 18px; flex-shrink: 0; }
+  li.exp-row.is-absent .info .nom { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--red); }
+
+  .pin { display: inline-block; background: var(--navy); color: white; font-size: 11.5px; font-weight: 700;
+        padding: 2px 7px; border-radius: 6px; margin-right: 4px; }
+
+  .fiche-header { text-align: center; margin-bottom: 16px; }
+  .fiche-header .emoji-badge {
+    width: 56px; height: 56px; border-radius: 16px; background: var(--navy); color: white;
+    display: flex; align-items: center; justify-content: center; font-size: 24px; margin: 0 auto 10px;
+  }
+  .fiche-header h2 { margin: 0; font-size: 20px; color: var(--navy); }
+  .fiche-header .statut-tag {
+    display: inline-block; margin-top: 6px; font-size: 12px; padding: 3px 10px; border-radius: 20px;
+    background: var(--cream); color: var(--muted); border: 1px solid var(--line);
+  }
+
+  .info-row { display: flex; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 14.5px; }
+  .info-row:last-child { border-bottom: none; }
+  .info-row .k { width: 40%; color: var(--muted); flex-shrink: 0; }
+  .info-row .v { flex: 1; font-weight: 500; word-break: break-word; }
+
+  .contact-card {
+    border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 10px;
+  }
+  .contact-card .nom { font-weight: 700; margin-bottom: 8px; font-size: 14.5px; }
+  .contact-actions { display: flex; gap: 8px; }
+  .contact-actions a {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 10px; border-radius: 10px; text-decoration: none; font-size: 13.5px; font-weight: 600;
+  }
+  .contact-actions a.call { background: var(--green-bg); color: var(--green); }
+  .contact-actions a.mail { background: #e8eef3; color: var(--navy); }
+
+  .besoins-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .chip { background: var(--cream); border: 1px solid var(--line); border-radius: 20px; padding: 4px 11px; font-size: 12.5px; color: var(--navy); }
+
+  .footer-note { text-align: center; color: var(--muted); font-size: 12px; margin-top: 18px; line-height: 1.5; }
+
+  .toast {
+    position: fixed; bottom: 18px; left: 16px; right: 16px; background: var(--navy); color: white;
+    padding: 13px 16px; border-radius: 12px; font-size: 14px; text-align: center;
+    box-shadow: 0 4px 14px rgba(0,0,0,.25); z-index: 100;
+    opacity: 0; transform: translateY(10px); transition: opacity .2s, transform .2s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: none; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header class="topbar">
+    <button class="back" id="btn-back" style="display:none;">←</button>
+    <div class="title-block">
+      <h1 id="header-title">Ymarché</h1>
+      <div class="subtitle" id="header-subtitle">Suivi de présence — jour de marché</div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ============ ECRAN 1 : TABLEAU DE BORD ============ -->
+    <section class="screen active" id="screen-dashboard">
+
+      <div class="card" id="card-no-data">
+        <h2>📂 Charger une sauvegarde</h2>
+        <p class="hint">Ouvrez le fichier de sauvegarde complète exporté depuis Ymarché (Gestion → Imports/Exports, ou Gestion → Sauvegardes).</p>
+        <button class="btn btn-primary" id="btn-choose-file">Choisir le fichier de sauvegarde</button>
+        <input type="file" id="file-input" accept=".txt">
+      </div>
+
+      <div id="card-has-data" style="display:none;">
+        <div class="card">
+          <h2>📅 Événement</h2>
+          <p class="hint">Choisissez l'événement sur lequel travailler.</p>
+          <label class="field-label">Événement</label>
+          <select id="select-evenement"></select>
+        </div>
+
+        <div class="stat-row" id="dashboard-stats"></div>
+
+        <button class="btn btn-primary" id="btn-goto-listing">✓ Accéder au listing des présences</button>
+        <button class="btn btn-navy" id="btn-send-report">✉️ Envoyer le rapport de présence par e-mail</button>
+        <button class="btn btn-ghost" id="btn-copy-report">📋 Copier le texte du rapport</button>
+        <button class="btn btn-ghost" id="btn-reload-file">📂 Charger une autre sauvegarde</button>
+      </div>
+
+    </section>
+
+    <!-- ============ ECRAN 2 : LISTING ============ -->
+    <section class="screen" id="screen-listing">
+      <div class="stat-row" id="listing-stats"></div>
+      <div class="search-bar">
+        <span class="icon">🔎</span>
+        <input type="text" id="search-input" placeholder="Rechercher un exposant…">
+      </div>
+      <div class="quick-actions">
+        <button class="btn btn-ghost btn-sm" id="btn-check-all">✓ Tout cocher présent</button>
+        <button class="btn btn-ghost btn-sm" id="btn-uncheck-all">✕ Tout décocher</button>
+      </div>
+      <ul class="exp-list" id="exp-list"></ul>
+      <div class="empty-state" id="listing-empty" style="display:none;">
+        <span class="emoji">🔍</span>
+        Aucun exposant ne correspond à votre recherche.
+      </div>
+    </section>
+
+    <!-- ============ ECRAN 3 : FICHE EXPOSANT ============ -->
+    <section class="screen" id="screen-fiche">
+      <div id="fiche-content"></div>
+    </section>
+
+  </main>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ------------------------------------------------------------ état
+  var STORAGE_KEY = "ymarche_backup_v1";
+  var STORAGE_EVENEMENT_KEY = "ymarche_evenement_actif";
+  var STORAGE_PRESENCES_PREFIX = "ymarche_presences_";
+  var ADRESSE_MAIL_RAPPORT = "contact@mairie-ymare.fr";
+
+  var donnees = null;          // { exposants:[], contacts:[], evenements:[], participations:[] }
+  var evenementActifId = null;
+  var presences = {};          // { exposant_id: true/false } pour l'evenement actif
+  var rechercheTexte = "";
+  var ficheExposantId = null;
+  var pileEcrans = ["screen-dashboard"];
+
+  // ------------------------------------------------------------ utilitaires
+  function $(id) { return document.getElementById(id); }
+
+  function toast(msg) {
+    var t = $("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toast._h);
+    toast._h = setTimeout(function () { t.classList.remove("show"); }, 2600);
+  }
+
+  function escHtml(s) {
+    return (s == null ? "" : String(s)).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function formatDateFr(iso) {
+    if (!iso) return "";
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+    if (!m) return iso;
+    return m[3] + "/" + m[2] + "/" + m[1];
+  }
+
+  // ------------------------------------------------------------ parsing sauvegarde
+  var MARQUEUR = "# SAUVEGARDE COMPLETE YMARCHE";
+
+  function parseBackup(texte) {
+    var lignes = texte.split(/\r?\n/);
+    if (!lignes[0] || lignes[0].trim().indexOf(MARQUEUR) !== 0) {
+      throw new Error("Ce fichier ne semble pas être une sauvegarde complète Ymarché (marqueur d'en-tête absent).");
+    }
+    var resultat = {};
+    var tableCourante = null;
+    for (var i = 1; i < lignes.length; i++) {
+      var ligne = lignes[i];
+      if (ligne.indexOf("#TABLE:") === 0) {
+        tableCourante = ligne.slice(7).trim();
+        continue;
+      }
+      if (tableCourante === null || !ligne.trim() || ligne.indexOf("#") === 0) {
+        continue;
+      }
+      try {
+        resultat[tableCourante] = JSON.parse(ligne);
+      } catch (e) {
+        throw new Error("Fichier de sauvegarde corrompu (table '" + tableCourante + "' illisible).");
+      }
+      tableCourante = null;
+    }
+    if (!resultat.exposants || !resultat.evenements) {
+      throw new Error("Ce fichier ne contient pas les données attendues (exposants/événements introuvables).");
+    }
+    return resultat;
+  }
+
+  // ------------------------------------------------------------ persistance locale
+  function sauvegarderDonnees() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(donnees)); } catch (e) { /* stockage plein : tant pis */ }
+  }
+  function chargerDonneesLocales() {
+    try {
+      var brut = localStorage.getItem(STORAGE_KEY);
+      return brut ? JSON.parse(brut) : null;
+    } catch (e) { return null; }
+  }
+  function clePresences(eventId) { return STORAGE_PRESENCES_PREFIX + eventId; }
+  function sauvegarderPresences() {
+    if (evenementActifId == null) return;
+    try { localStorage.setItem(clePresences(evenementActifId), JSON.stringify(presences)); } catch (e) {}
+  }
+  function chargerPresences(eventId) {
+    try {
+      var brut = localStorage.getItem(clePresences(eventId));
+      return brut ? JSON.parse(brut) : {};
+    } catch (e) { return {}; }
+  }
+  function sauvegarderEvenementActif() {
+    try {
+      if (evenementActifId != null) localStorage.setItem(STORAGE_EVENEMENT_KEY, String(evenementActifId));
+    } catch (e) {}
+  }
+  function chargerEvenementActif() {
+    try {
+      var brut = localStorage.getItem(STORAGE_EVENEMENT_KEY);
+      return brut != null ? parseInt(brut, 10) : null;
+    } catch (e) { return null; }
+  }
+
+  // ------------------------------------------------------------ acces aux donnees
+  function getExposant(id) {
+    return (donnees.exposants || []).find(function (e) { return e.id === id; });
+  }
+  function getContacts(exposantId) {
+    return (donnees.contacts || []).filter(function (c) { return c.exposant_id === exposantId; })
+      .sort(function (a, b) { return (a.ordre || 0) - (b.ordre || 0); });
+  }
+  function getParticipationsEvenement(eventId) {
+    var parts = (donnees.participations || []).filter(function (p) {
+      return p.evenement_id === eventId && (p.present === 1 || p.present === true);
+    });
+    var lignes = parts.map(function (p) {
+      return { participation: p, exposant: getExposant(p.exposant_id) };
+    }).filter(function (l) { return !!l.exposant; });
+    lignes.sort(function (a, b) {
+      var ea = (a.participation.emplacements || "").trim() || "zzz";
+      var eb = (b.participation.emplacements || "").trim() || "zzz";
+      if (ea < eb) return -1;
+      if (ea > eb) return 1;
+      return (a.exposant.entreprise || "").localeCompare(b.exposant.entreprise || "");
+    });
+    return lignes;
+  }
+
+  // Recense, pour un événement donné, l'ensemble des lettres de fraction
+  // rencontrées pour chaque numéro d'emplacement de base (ex. base "18"
+  // -> {A, B, C}) en parcourant TOUTES les participations -- permet de
+  // savoir si un exposant occupe l'emplacement en entier ou seulement
+  // une fraction, comme dans le plan interactif du logiciel principal.
+  function construireBasesConnues(eventId) {
+    var basesConnues = {};
+    (donnees.participations || []).filter(function (p) { return p.evenement_id === eventId; }).forEach(function (p) {
+      (p.emplacements || "").split(",").map(function (s) { return s.trim(); }).filter(Boolean).forEach(function (code) {
+        var m = /^(\d+)([A-Za-z]+)$/.exec(code);
+        if (!m) return;
+        var base = m[1], suffixe = m[2].toUpperCase();
+        if (!basesConnues[base]) basesConnues[base] = {};
+        basesConnues[base][suffixe] = true;
+      });
+    });
+    return basesConnues;
+  }
+
+  // Reformate la chaine brute d'emplacements d'un exposant (ex.
+  // "18A, 18B, 18C") en notation compacte : "18" si toutes les
+  // fractions connues de la base sont occupées par ce même exposant,
+  // sinon les codes détaillés inchangés (ex. "18A, 18B").
+  function regrouperEmplacements(chaineEmplacements, basesConnues) {
+    var codes = (chaineEmplacements || "").split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+    if (!codes.length) return "";
+    var groupes = {}, ordreBases = [], codesBruts = [];
+    codes.forEach(function (code) {
+      var m = /^(\d+)([A-Za-z]+)$/.exec(code);
+      if (!m) { codesBruts.push(code); return; }
+      var base = m[1], suffixe = m[2].toUpperCase();
+      if (!groupes[base]) { groupes[base] = []; ordreBases.push(base); }
+      groupes[base].push(suffixe);
+    });
+    var resultats = ordreBases.map(function (base) {
+      var mesSuffixes = groupes[base];
+      var connues = basesConnues[base] || {};
+      var suffixesConnus = Object.keys(connues);
+      var complet = suffixesConnus.length > 1 &&
+        mesSuffixes.length === suffixesConnus.length &&
+        suffixesConnus.every(function (s) { return mesSuffixes.indexOf(s) !== -1; });
+      if (complet) return base;
+      return mesSuffixes.slice().sort().map(function (s) { return base + s; }).join(", ");
+    });
+    return resultats.concat(codesBruts).join(", ");
+  }
+
+  // ------------------------------------------------------------ navigation
+  function afficherEcran(id) {
+    document.querySelectorAll(".screen").forEach(function (s) { s.classList.remove("active"); });
+    $(id).classList.add("active");
+    $("btn-back").style.display = (id === "screen-dashboard") ? "none" : "flex";
+  }
+
+  function allerA(id) {
+    pileEcrans.push(id);
+    afficherEcran(id);
+    majEntete(id);
+  }
+
+  function retour() {
+    if (pileEcrans.length > 1) {
+      pileEcrans.pop();
+      var precedent = pileEcrans[pileEcrans.length - 1];
+      afficherEcran(precedent);
+      majEntete(precedent);
+    }
+  }
+
+  function majEntete(id) {
+    var ev = evenementActifId != null ? donnees.evenements.find(function (e) { return e.id === evenementActifId; }) : null;
+    if (id === "screen-dashboard") {
+      $("header-title").textContent = "Ymarché";
+      $("header-subtitle").textContent = "Suivi de présence — jour de marché";
+    } else if (id === "screen-listing") {
+      $("header-title").textContent = ev ? ev.nom : "Listing";
+      $("header-subtitle").textContent = ev ? (formatDateFr(ev.date_evenement) + (ev.lieu ? " — " + ev.lieu : "")) : "";
+    } else if (id === "screen-fiche") {
+      var exp = getExposant(ficheExposantId);
+      $("header-title").textContent = exp ? exp.entreprise : "Fiche exposant";
+      $("header-subtitle").textContent = ev ? ev.nom : "";
+    }
+  }
+
+  $("btn-back").addEventListener("click", retour);
+
+  // ------------------------------------------------------------ ecran 1 : dashboard
+  function rendreDashboard() {
+    var aDesDonnees = !!donnees;
+    $("card-no-data").style.display = aDesDonnees ? "none" : "block";
+    $("card-has-data").style.display = aDesDonnees ? "block" : "none";
+    if (!aDesDonnees) return;
+
+    var select = $("select-evenement");
+    var evenements = (donnees.evenements || []).slice().sort(function (a, b) {
+      return (b.date_evenement || "").localeCompare(a.date_evenement || "");
+    });
+    select.innerHTML = evenements.map(function (e) {
+      return '<option value="' + e.id + '">' + escHtml(e.nom) + " (" + formatDateFr(e.date_evenement) + ")</option>";
+    }).join("");
+
+    var evenementSauvegarde = chargerEvenementActif();
+    var existeEncore = evenements.some(function (e) { return e.id === evenementSauvegarde; });
+    if (evenementActifId == null) {
+      evenementActifId = existeEncore ? evenementSauvegarde : (evenements.length ? evenements[0].id : null);
+      if (evenementActifId != null) presences = chargerPresences(evenementActifId);
+    }
+    if (evenementActifId != null) select.value = evenementActifId;
+
+    rendreStatsDashboard();
+  }
+
+  function rendreStatsDashboard() {
+    if (evenementActifId == null) { $("dashboard-stats").innerHTML = ""; return; }
+    var lignes = getParticipationsEvenement(evenementActifId);
+    var nbPresents = lignes.filter(function (l) { return estPresent(l.exposant.id); }).length;
+    $("dashboard-stats").innerHTML =
+      '<div class="stat-box"><div class="num">' + lignes.length + '</div><div class="lbl">Attendus</div></div>' +
+      '<div class="stat-box present"><div class="num">' + nbPresents + '</div><div class="lbl">Présents</div></div>' +
+      '<div class="stat-box absent"><div class="num">' + (lignes.length - nbPresents) + '</div><div class="lbl">Absents</div></div>';
+  }
+
+  $("select-evenement").addEventListener("change", function () {
+    evenementActifId = parseInt(this.value, 10);
+    sauvegarderEvenementActif();
+    presences = chargerPresences(evenementActifId);
+    rendreStatsDashboard();
+  });
+
+  $("btn-choose-file").addEventListener("click", function () { $("file-input").click(); });
+  $("btn-reload-file").addEventListener("click", function () { $("file-input").click(); });
+
+  $("file-input").addEventListener("change", function (evt) {
+    var fichier = evt.target.files[0];
+    if (!fichier) return;
+    var lecteur = new FileReader();
+    lecteur.onload = function () {
+      try {
+        donnees = parseBackup(lecteur.result);
+        sauvegarderDonnees();
+        evenementActifId = null;
+        toast("Sauvegarde chargée : " + (donnees.exposants || []).length + " exposant(s), " +
+          (donnees.evenements || []).length + " événement(s).");
+        rendreDashboard();
+      } catch (e) {
+        alert("Erreur : " + e.message);
+      }
+    };
+    lecteur.readAsText(fichier, "UTF-8");
+    evt.target.value = "";
+  });
+
+  $("btn-goto-listing").addEventListener("click", function () {
+    if (evenementActifId == null) { toast("Choisissez un événement."); return; }
+    presences = chargerPresences(evenementActifId);
+    rechercheTexte = "";
+    $("search-input").value = "";
+    allerA("screen-listing");
+    rendreListing();
+  });
+
+  $("btn-send-report").addEventListener("click", envoyerRapport);
+  $("btn-copy-report").addEventListener("click", copierRapport);
+
+  // ------------------------------------------------------------ presence (etat)
+  function estPresent(exposantId) {
+    if (Object.prototype.hasOwnProperty.call(presences, exposantId)) return !!presences[exposantId];
+    return false; // par defaut : decoche, on coche au fur et a mesure des arrivees
+  }
+  function togglePresence(exposantId) {
+    presences[exposantId] = !estPresent(exposantId);
+    sauvegarderPresences();
+  }
+
+  // ------------------------------------------------------------ ecran 2 : listing
+  function rendreListing() {
+    var lignes = getParticipationsEvenement(evenementActifId);
+    var basesConnues = construireBasesConnues(evenementActifId);
+    var recherche = rechercheTexte.trim().toLowerCase();
+    var filtrees = recherche
+      ? lignes.filter(function (l) { return (l.exposant.entreprise || "").toLowerCase().indexOf(recherche) !== -1; })
+      : lignes;
+
+    var nbPresents = lignes.filter(function (l) { return estPresent(l.exposant.id); }).length;
+    $("listing-stats").innerHTML =
+      '<div class="stat-box"><div class="num">' + lignes.length + '</div><div class="lbl">Attendus</div></div>' +
+      '<div class="stat-box present"><div class="num">' + nbPresents + '</div><div class="lbl">Présents</div></div>' +
+      '<div class="stat-box absent"><div class="num">' + (lignes.length - nbPresents) + '</div><div class="lbl">Absents</div></div>';
+
+    var liste = $("exp-list");
+    $("listing-empty").style.display = filtrees.length === 0 ? "block" : "none";
+    liste.innerHTML = filtrees.map(function (l) {
+      var present = estPresent(l.exposant.id);
+      var emp = regrouperEmplacements(l.participation.emplacements, basesConnues);
+      return (
+        '<li class="exp-row' + (present ? "" : " is-absent") + '" data-id="' + l.exposant.id + '">' +
+          '<div class="checkbox ' + (present ? "checked" : "unchecked") + '" data-action="toggle">' +
+            (present ? "✓" : "✕") +
+          "</div>" +
+          '<div class="info" data-action="open">' +
+            '<div class="nom">' + escHtml(l.exposant.entreprise) + "</div>" +
+            '<div class="emp">' + (emp ? "📍 " + escHtml(emp) : "—") + "</div>" +
+          "</div>" +
+          '<div class="chevron" data-action="open">›</div>' +
+        "</li>"
+      );
+    }).join("");
+  }
+
+  $("search-input").addEventListener("input", function () {
+    rechercheTexte = this.value;
+    rendreListing();
+  });
+
+  $("btn-check-all").addEventListener("click", function () {
+    getParticipationsEvenement(evenementActifId).forEach(function (l) { presences[l.exposant.id] = true; });
+    sauvegarderPresences();
+    rendreListing();
+  });
+  $("btn-uncheck-all").addEventListener("click", function () {
+    getParticipationsEvenement(evenementActifId).forEach(function (l) { presences[l.exposant.id] = false; });
+    sauvegarderPresences();
+    rendreListing();
+  });
+
+  $("exp-list").addEventListener("click", function (evt) {
+    var ligne = evt.target.closest("li.exp-row");
+    if (!ligne) return;
+    var id = parseInt(ligne.getAttribute("data-id"), 10);
+    var action = evt.target.getAttribute("data-action") || (evt.target.closest("[data-action]") || {}).getAttribute
+      && evt.target.closest("[data-action]").getAttribute("data-action");
+    if (action === "toggle") {
+      togglePresence(id);
+      rendreListing();
+    } else {
+      ficheExposantId = id;
+      allerA("screen-fiche");
+      rendreFiche();
+    }
+  });
+
+  // ------------------------------------------------------------ ecran 3 : fiche exposant
+  function rendreFiche() {
+    var exp = getExposant(ficheExposantId);
+    if (!exp) return;
+    var ligne = getParticipationsEvenement(evenementActifId).find(function (l) { return l.exposant.id === ficheExposantId; });
+    var basesConnues = construireBasesConnues(evenementActifId);
+    var empAffiche = ligne ? regrouperEmplacements(ligne.participation.emplacements, basesConnues) : "";
+    var present = estPresent(ficheExposantId);
+    var contacts = getContacts(ficheExposantId);
+
+    var besoins = [];
+    if (exp.besoin_eau) besoins.push("💧 Eau");
+    if (exp.besoin_electricite) besoins.push("⚡ Élec" + (exp.puissance_kw ? " (" + exp.puissance_kw + " kW)" : ""));
+    if (exp.besoin_tonnelle) besoins.push("⛺ Tonnelle");
+    if (exp.besoin_frigo) besoins.push("🧊 Frigo");
+    if (exp.besoin_autre) besoins.push("✱ " + (exp.besoin_autre_texte || "Autre"));
+
+    var html = "";
+    html += '<div class="fiche-header">' +
+      '<div class="emoji-badge">🏪</div>' +
+      "<h2>" + escHtml(exp.entreprise) + "</h2>" +
+      '<div class="statut-tag">' + (empAffiche ? "📍 " + escHtml(empAffiche) : "Emplacement non renseigné") + "</div>" +
+      "</div>";
+
+    html += '<div class="card">' +
+      '<div class="btn-row">' +
+        '<button class="btn ' + (present ? "btn-ghost" : "btn-primary") + '" id="fiche-toggle-presence">' +
+          (present ? "✕ Marquer absent" : "✓ Marquer présent") +
+        "</button>" +
+      "</div>" +
+    "</div>";
+
+    html += '<div class="card">';
+    if (exp.type_exposant) html += infoRow("Type", exp.type_exposant);
+    if (exp.activite) html += infoRow("Activité", exp.activite);
+    if (exp.adresse) html += infoRow("Adresse", exp.adresse);
+    if (exp.gerant) html += infoRow("Gérant", exp.gerant);
+    if (exp.siret) html += infoRow("SIRET", exp.siret);
+    html += infoRow("Assurance", exp.assurance_recue ? "✓ Reçue" : "⚠ Non reçue");
+    html += infoRow("Kbis", exp.kbis_recu ? "✓ Reçu" : "⚠ Non reçu");
+    html += "</div>";
+
+    if (besoins.length) {
+      html += '<div class="card"><h2>Besoins techniques</h2><div class="besoins-chips">' +
+        besoins.map(function (b) { return '<span class="chip">' + escHtml(b) + "</span>"; }).join("") +
+        "</div></div>";
+    }
+
+    if (contacts.length) {
+      html += '<div class="card"><h2>Contacts</h2>';
+      contacts.forEach(function (c) {
+        html += '<div class="contact-card">';
+        html += '<div class="nom">' + escHtml(c.nom || "Contact") + "</div>";
+        html += '<div class="contact-actions">';
+        if (c.telephone) {
+          html += '<a class="call" href="tel:' + escHtml(c.telephone.replace(/\s+/g, "")) + '">📞 Appeler</a>';
+        }
+        if (c.email) {
+          html += '<a class="mail" href="mailto:' + escHtml(c.email) + '">✉️ E-mail</a>';
+        }
+        html += "</div></div>";
+      });
+      html += "</div>";
+    } else {
+      html += '<div class="card"><p class="hint">Aucun contact enregistré pour cet exposant.</p></div>';
+    }
+
+    if (exp.site_web) {
+      html += '<div class="card">' + infoRow("Site web", '<a href="' + escHtml(exp.site_web) + '" target="_blank">' + escHtml(exp.site_web) + "</a>") + "</div>";
+    }
+
+    if (exp.commentaires) {
+      html += '<div class="card"><h2>Commentaires</h2><p class="hint" style="margin:0;">' + escHtml(exp.commentaires) + "</p></div>";
+    }
+
+    $("fiche-content").innerHTML = html;
+    $("fiche-toggle-presence").addEventListener("click", function () {
+      togglePresence(ficheExposantId);
+      rendreFiche();
+    });
+  }
+
+  function infoRow(label, valeur) {
+    return '<div class="info-row"><div class="k">' + escHtml(label) + '</div><div class="v">' + valeur + "</div></div>";
+  }
+
+  // ------------------------------------------------------------ envoi du rapport par e-mail
+  function construireRapportTexte() {
+    var ev = donnees.evenements.find(function (e) { return e.id === evenementActifId; });
+    var lignes = getParticipationsEvenement(evenementActifId);
+    var basesConnues = construireBasesConnues(evenementActifId);
+
+    function libelle(l) {
+      var emp = regrouperEmplacements(l.participation.emplacements, basesConnues);
+      return (emp ? emp + " — " : "") + l.exposant.entreprise;
+    }
+
+    var presents = lignes.filter(function (l) { return estPresent(l.exposant.id); });
+    var absents = lignes.filter(function (l) { return !estPresent(l.exposant.id); });
+
+    var sujet = "Rapport de présence — " + ev.nom + " (" + formatDateFr(ev.date_evenement) + ")";
+    var corps = "Rapport de présence\n" + ev.nom + " — " + formatDateFr(ev.date_evenement) +
+      (ev.lieu ? " — " + ev.lieu : "") + "\n" +
+      presents.length + " présent(s) / " + absents.length + " absent(s) / " + lignes.length + " attendu(s)\n\n";
+    corps += "Présent : " + (presents.length ? presents.map(libelle).join(", ") : "—") + "\n\n";
+    corps += "Absent : " + (absents.length ? absents.map(libelle).join(", ") : "—") + "\n";
+
+    return { sujet: sujet, corps: corps, nbLignes: lignes.length };
+  }
+
+  function envoyerRapport() {
+    if (evenementActifId == null) { toast("Choisissez un événement."); return; }
+    var rapport = construireRapportTexte();
+    if (!rapport.nbLignes) { toast("Aucun exposant attendu pour cet événement."); return; }
+    var lien = "mailto:" + encodeURIComponent(ADRESSE_MAIL_RAPPORT) +
+      "?subject=" + encodeURIComponent(rapport.sujet) + "&body=" + encodeURIComponent(rapport.corps);
+    window.location.href = lien;
+  }
+
+  function copierRapport() {
+    if (evenementActifId == null) { toast("Choisissez un événement."); return; }
+    var rapport = construireRapportTexte();
+    if (!rapport.nbLignes) { toast("Aucun exposant attendu pour cet événement."); return; }
+    copierTexte("Objet : " + rapport.sujet + "\n\n" + rapport.corps);
+  }
+
+  function copierTexte(texte) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(texte).then(function () { toast("Texte copié dans le presse-papier."); });
+    } else {
+      var zoneTemp = document.createElement("textarea");
+      zoneTemp.value = texte;
+      document.body.appendChild(zoneTemp);
+      zoneTemp.select();
+      try { document.execCommand("copy"); toast("Texte copié dans le presse-papier."); } catch (e) {}
+      document.body.removeChild(zoneTemp);
+    }
+  }
+
+  // ------------------------------------------------------------ demarrage
+  function demarrer() {
+    donnees = chargerDonneesLocales();
+    if (donnees && donnees.evenements && donnees.evenements.length) {
+      toast("Dernière sauvegarde chargée automatiquement.");
+    }
+    rendreDashboard();
+  }
+
+  demarrer();
+})();
+</script>
+</body>
+</html>
