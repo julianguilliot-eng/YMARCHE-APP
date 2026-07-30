@@ -76,7 +76,9 @@
   .btn-ghost { background: var(--cream); color: var(--navy); border: 1px solid var(--line); }
   .btn-ghost:active { background: #ece6d8; }
   .btn-sm { padding: 9px 12px; font-size: 13.5px; width: auto; }
+  .btn-lg { padding: 20px 16px; font-size: 17.5px; font-weight: 700; border-radius: 14px; }
   .btn + .btn { margin-top: 10px; }
+  .btn-lg + .btn { margin-top: 16px; }
   .btn-row { display: flex; gap: 10px; }
   .btn-row .btn { margin-top: 0; }
   .btn[disabled] { opacity: .45; pointer-events: none; }
@@ -209,10 +211,11 @@
 
         <div class="stat-row" id="dashboard-stats"></div>
 
-        <button class="btn btn-primary" id="btn-goto-listing">✓ Accéder au listing des présences</button>
+        <button class="btn btn-primary btn-lg" id="btn-goto-listing">✓ Accéder au listing des présences</button>
         <button class="btn btn-navy" id="btn-send-report">✉️ Envoyer le rapport de présence par e-mail</button>
         <button class="btn btn-ghost" id="btn-copy-report">📋 Copier le texte du rapport</button>
         <button class="btn btn-ghost" id="btn-reload-file">📂 Charger une autre sauvegarde</button>
+        <button class="btn btn-ghost" id="btn-reset" style="color: var(--red);">🗑 Effacer la sauvegarde en cours</button>
       </div>
 
     </section>
@@ -367,10 +370,6 @@
       return { participation: p, exposant: getExposant(p.exposant_id) };
     }).filter(function (l) { return !!l.exposant; });
     lignes.sort(function (a, b) {
-      var ea = (a.participation.emplacements || "").trim() || "zzz";
-      var eb = (b.participation.emplacements || "").trim() || "zzz";
-      if (ea < eb) return -1;
-      if (ea > eb) return 1;
       return (a.exposant.entreprise || "").localeCompare(b.exposant.entreprise || "");
     });
     return lignes;
@@ -508,6 +507,40 @@
 
   $("btn-choose-file").addEventListener("click", function () { $("file-input").click(); });
   $("btn-reload-file").addEventListener("click", function () { $("file-input").click(); });
+
+  var confirmationReset = false;
+  var timerConfirmationReset = null;
+  $("btn-reset").addEventListener("click", function () {
+    var bouton = this;
+    if (!confirmationReset) {
+      confirmationReset = true;
+      bouton.textContent = "⚠ Appuyez à nouveau pour confirmer";
+      timerConfirmationReset = setTimeout(function () {
+        confirmationReset = false;
+        bouton.textContent = "🗑 Effacer la sauvegarde en cours";
+      }, 4000);
+      return;
+    }
+    clearTimeout(timerConfirmationReset);
+    confirmationReset = false;
+    bouton.textContent = "🗑 Effacer la sauvegarde en cours";
+
+    try {
+      var toutesLesCles = [];
+      for (var i = 0; i < localStorage.length; i++) toutesLesCles.push(localStorage.key(i));
+      toutesLesCles.forEach(function (cle) {
+        if (cle === STORAGE_KEY || cle === STORAGE_EVENEMENT_KEY || cle.indexOf(STORAGE_PRESENCES_PREFIX) === 0) {
+          localStorage.removeItem(cle);
+        }
+      });
+    } catch (e) {}
+
+    donnees = null;
+    evenementActifId = null;
+    presences = {};
+    rendreDashboard();
+    toast("Sauvegarde effacée. Chargez le fichier du prochain marché.");
+  });
 
   $("file-input").addEventListener("change", function (evt) {
     var fichier = evt.target.files[0];
