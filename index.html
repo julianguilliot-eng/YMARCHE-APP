@@ -167,6 +167,43 @@
   .besoins-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
   .chip { background: var(--cream); border: 1px solid var(--line); border-radius: 20px; padding: 4px 11px; font-size: 12.5px; color: var(--navy); }
 
+  .zone-elec {
+    margin-top: 14px; padding: 12px 14px; border: 1px solid var(--line);
+    border-radius: 12px; background: var(--cream);
+  }
+  .zone-elec.alerte { background: #fff6e5; border-color: #f0d9a8; }
+  .zone-elec .ligne-zone { display: flex; align-items: center; gap: 10px; }
+  .zone-elec .pastille {
+    width: 24px; height: 24px; border-radius: 7px; flex-shrink: 0;
+    border: 1px solid rgba(0,0,0,.18);
+  }
+  .zone-elec .nom-zone { font-weight: 700; font-size: 15.5px; color: var(--navy); }
+  .zone-elec .conso { margin-top: 8px; font-size: 14.5px; }
+  .zone-elec .conso b { font-size: 16px; }
+  .zone-elec .note { margin-top: 6px; font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+
+  /* Page « Zones électriques » */
+  .zones-total { text-align: center; margin-bottom: 14px; }
+  .zones-total .grand { font-size: 15px; color: var(--navy); }
+  .zones-total .grand b { font-size: 22px; }
+  .zones-total .sous { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .zones-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+  .zone-rect {
+    border-radius: var(--radius); padding: 14px 12px 12px; color: var(--text);
+    border: 1px solid rgba(0,0,0,.12); box-shadow: 0 1px 3px rgba(23,50,74,.10);
+    display: flex; flex-direction: column;
+  }
+  .zone-rect .zr-nom { font-weight: 800; font-size: 15px; color: var(--navy); }
+  .zone-rect .zr-kw { font-size: 30px; font-weight: 800; line-height: 1.1; margin-top: 6px; color: var(--navy); }
+  .zone-rect .zr-kw span { font-size: 16px; font-weight: 700; }
+  .zone-rect .zr-nb { font-size: 12.5px; margin-top: 2px; color: rgba(42,38,34,.75); }
+  .zone-rect .zr-alerte { font-size: 12px; margin-top: 6px; color: var(--red); font-weight: 600; line-height: 1.3; }
+  .zone-rect .zr-emp {
+    margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,.14);
+    font-size: 11.5px; line-height: 1.5; color: rgba(42,38,34,.85); word-break: break-word;
+  }
+  .zone-rect .zr-emp b { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; opacity: .7; }
+
   .footer-note { text-align: center; color: var(--muted); font-size: 12px; margin-top: 18px; line-height: 1.5; }
 
   .toast {
@@ -196,7 +233,7 @@
 
       <div class="card" id="card-no-data">
         <h2>📂 Charger une sauvegarde</h2>
-        <p class="hint">Ouvrez le fichier de sauvegarde complète exporté depuis Ymarché (Gestion → Imports/Exports, ou Gestion → Sauvegardes).</p>
+        <p class="hint">Ouvrez un fichier de sauvegarde exporté depuis Ymarché : « Sauvegarde complète totale » (Gestion → Sauvegardes) ou « Sauvegarde complète événement » (depuis la fenêtre d'un événement, ou celle du dossier complet). La sauvegarde « événement (légère) » ne convient pas à cette application.</p>
         <button class="btn btn-primary" id="btn-choose-file">Choisir le fichier de sauvegarde</button>
         <input type="file" id="file-input" accept=".txt">
       </div>
@@ -212,6 +249,7 @@
         <div class="stat-row" id="dashboard-stats"></div>
 
         <button class="btn btn-primary btn-lg" id="btn-goto-listing">✓ Accéder au listing des présences</button>
+        <button class="btn btn-navy" id="btn-goto-zones">⚡ Zones électriques</button>
         <button class="btn btn-navy" id="btn-send-report">✉️ Envoyer le rapport de présence par e-mail</button>
         <button class="btn btn-ghost" id="btn-copy-report">📋 Copier le texte du rapport</button>
         <button class="btn btn-ghost" id="btn-reload-file">📂 Charger une autre sauvegarde</button>
@@ -236,6 +274,11 @@
         <span class="emoji">🔍</span>
         Aucun exposant ne correspond à votre recherche.
       </div>
+    </section>
+
+    <!-- ============ ECRAN : ZONES ELECTRIQUES ============ -->
+    <section class="screen" id="screen-zones">
+      <div id="zones-content"></div>
     </section>
 
     <!-- ============ ECRAN 3 : FICHE EXPOSANT ============ -->
@@ -295,7 +338,7 @@
   function parseBackup(texte) {
     var lignes = texte.split(/\r?\n/);
     if (!lignes[0] || lignes[0].trim().indexOf(MARQUEUR) !== 0) {
-      throw new Error("Ce fichier ne semble pas être une sauvegarde complète Ymarché (marqueur d'en-tête absent).");
+      throw new Error("Ce fichier ne semble pas être une sauvegarde complète Ymarché (marqueur d'en-tête absent). Utilisez une « Sauvegarde complète totale » ou une « Sauvegarde complète événement » — pas la sauvegarde « événement (légère) ».");
     }
     var resultat = {};
     var tableCourante = null;
@@ -422,6 +465,229 @@
     return resultats.concat(codesBruts).join(", ");
   }
 
+  // ------------------------------------------------------------ zones électriques
+  // Mêmes règles que le logiciel Ymarché (voir emplacements_utils.py) :
+  //  - un emplacement de base couvre ses fractions (une zone « 12 » contient 12A, 12B...) ;
+  //  - un exposant n'est compté que DANS UNE SEULE zone, même s'il occupe des
+  //    emplacements de plusieurs zones : celle où il en a le plus, à égalité celle
+  //    de son premier emplacement saisi.
+  // Couleurs : identiques à celles du plan électrique imprimé.
+  var PALETTE_ZONES = ["F4A6A6", "F9CB8B", "F6E58D", "A9DFA0", "8FD8D0", "9EC5F8", "C3A8F0", "F2A9D4", "D5BE9B", "B7C4CE"];
+  var COULEUR_HORS_ZONE = "D9D9D9";
+  var FRACTION_RE = /^(\d+)([A-Za-z])$/;
+
+  function normaliserCode(c) { return String(c == null ? "" : c).trim().toUpperCase(); }
+  function lireJson(texte) { try { return JSON.parse(texte); } catch (e) { return null; } }
+  function evenementActif() {
+    return (donnees.evenements || []).find(function (e) { return e.id === evenementActifId; }) || null;
+  }
+
+  // Zones électriques appliquées à un événement. Les sauvegardes récentes portent
+  // directement les zones EFFECTIVES ; pour une sauvegarde plus ancienne on
+  // retrouve celles de l'événement, sinon le réglage par défaut enregistré.
+  function zonesDeLEvenement(ev) {
+    if (!ev) return [];
+    if (Array.isArray(ev.zones_electriques_effectives)) return ev.zones_electriques_effectives;
+    var propres = (typeof ev.zones_electriques === "string" && ev.zones_electriques) ? lireJson(ev.zones_electriques) : null;
+    if (Array.isArray(propres)) return propres;
+    var param = (donnees.parametres || []).find(function (p) { return p.cle === "zones_electriques_defaut"; });
+    var parDefaut = param ? lireJson(param.valeur) : null;
+    return Array.isArray(parDefaut) ? parDefaut : [];
+  }
+
+  function zoneDuCode(code, zonesCodes) {
+    var m = FRACTION_RE.exec(code);
+    var base = m ? m[1] : null;
+    for (var r = 0; r < zonesCodes.length; r++) {
+      if (zonesCodes[r][code] || (base !== null && zonesCodes[r][base])) return r;
+    }
+    return null;
+  }
+
+  function zoneRetenuePourExposant(codes, zonesCodes) {
+    var decompte = {}, meilleur = 0, i, rang;
+    for (i = 0; i < codes.length; i++) {
+      rang = zoneDuCode(codes[i], zonesCodes);
+      if (rang !== null) decompte[rang] = (decompte[rang] || 0) + 1;
+    }
+    Object.keys(decompte).forEach(function (r) { meilleur = Math.max(meilleur, decompte[r]); });
+    if (!meilleur) return null;
+    for (i = 0; i < codes.length; i++) {
+      rang = zoneDuCode(codes[i], zonesCodes);
+      if (rang !== null && decompte[rang] === meilleur) return rang;
+    }
+    return null;
+  }
+
+  // Situation électrique d'un exposant pour l'événement actif :
+  // zone retenue, nombre de zones occupées, puissance.
+  function infoElectrique(exp, participation) {
+    var zones = zonesDeLEvenement(evenementActif());
+    var codes = ((participation && participation.emplacements) || "").split(",").map(normaliserCode).filter(Boolean);
+    var zonesCodes = zones.map(function (z) {
+      var s = {};
+      (z.emplacements || []).forEach(function (c) { s[normaliserCode(c)] = true; });
+      return s;
+    });
+    var rang = codes.length ? zoneRetenuePourExposant(codes, zonesCodes) : null;
+    var distinctes = {};
+    codes.forEach(function (c) { var r = zoneDuCode(c, zonesCodes); if (r !== null) distinctes[r] = true; });
+    var kw = parseFloat(exp.puissance_kw);
+    return {
+      nbZonesDefinies: zones.length,
+      aDesEmplacements: codes.length > 0,
+      rang: rang,
+      nom: rang !== null ? (zones[rang].nom || ("Zone " + (rang + 1))) : null,
+      couleur: rang !== null ? PALETTE_ZONES[rang % PALETTE_ZONES.length] : COULEUR_HORS_ZONE,
+      nbZonesOccupees: Object.keys(distinctes).length,
+      kw: isNaN(kw) ? 0 : kw
+    };
+  }
+
+  function formaterKw(kw) { return String(Math.round(kw * 100) / 100); }
+
+  // Bloc « zone électrique » de la fiche : zone (avec sa couleur du plan) et consommation.
+  function htmlBlocElectrique(exp, participation) {
+    var ie = infoElectrique(exp, participation);
+    var alerte = false, ligneZone;
+    if (ie.rang !== null) {
+      ligneZone = '<span class="pastille" style="background:#' + ie.couleur + '"></span>' +
+                  '<span class="nom-zone">' + escHtml(ie.nom) + "</span>";
+    } else if (!ie.aDesEmplacements) {
+      alerte = true;
+      ligneZone = '<span class="pastille" style="background:#' + COULEUR_HORS_ZONE + '"></span>' +
+                  '<span class="nom-zone">Zone : emplacement non renseigné</span>';
+    } else if (!ie.nbZonesDefinies) {
+      alerte = true;
+      ligneZone = '<span class="pastille" style="background:#' + COULEUR_HORS_ZONE + '"></span>' +
+                  '<span class="nom-zone">Aucune zone électrique définie</span>';
+    } else {
+      alerte = true;
+      ligneZone = '<span class="pastille" style="background:#' + COULEUR_HORS_ZONE + '"></span>' +
+                  '<span class="nom-zone">⚠ Hors zone électrique</span>';
+    }
+    var conso;
+    if (ie.kw > 0) {
+      conso = "Consommation : <b>" + escHtml(formaterKw(ie.kw)) + " kW</b>";
+    } else {
+      alerte = true;
+      conso = "⚠ Puissance non renseignée";
+    }
+    var html = '<div class="zone-elec' + (alerte ? " alerte" : "") + '">' +
+      '<div class="ligne-zone">' + ligneZone + "</div>" +
+      '<div class="conso">' + conso + "</div>";
+    if (ie.nbZonesOccupees > 1 && ie.nom) {
+      html += '<div class="note">Emplacements répartis sur ' + ie.nbZonesOccupees +
+        " zones : la puissance n'est comptée qu'une seule fois, dans « " + escHtml(ie.nom) + " ».</div>";
+    }
+    return html + "</div>";
+  }
+
+  // ------------------------------------------------------------ page « Zones électriques »
+  function cleTriCode(c) {
+    var m = /^(\d+)(.*)$/.exec(c);
+    return m ? [parseInt(m[1], 10), m[2]] : [Infinity, c];
+  }
+  function comparerCodes(a, b) {
+    var x = cleTriCode(a), y = cleTriCode(b);
+    if (x[0] !== y[0]) return x[0] < y[0] ? -1 : 1;
+    return x[1] < y[1] ? -1 : (x[1] > y[1] ? 1 : 0);
+  }
+
+  // Liste d'emplacements lisible : tri numérique, et 3 numéros consécutifs ou plus
+  // regroupés en plage (ex. 11, 12, ... 19, 47, 48, 200 -> « 11 à 19, 47, 48, 200 »).
+  function condenserListeCodes(codes) {
+    var vus = {}, liste = [];
+    (codes || []).forEach(function (c) {
+      var n = normaliserCode(c);
+      if (n && !vus[n]) { vus[n] = true; liste.push(n); }
+    });
+    liste.sort(comparerCodes);
+    var entier = /^\d+$/, morceaux = [], i = 0;
+    while (i < liste.length) {
+      if (entier.test(liste[i])) {
+        var j = i;
+        while (j + 1 < liste.length && entier.test(liste[j + 1]) &&
+               parseInt(liste[j + 1], 10) === parseInt(liste[j], 10) + 1) j++;
+        if (j - i >= 2) { morceaux.push(liste[i] + " à " + liste[j]); i = j + 1; continue; }
+      }
+      morceaux.push(liste[i]);
+      i++;
+    }
+    return morceaux.join(", ");
+  }
+
+  // Puissance et exposants de chaque zone pour un événement -- mêmes règles que
+  // le logiciel : exposants ATTENDUS (ceux du planning de l'événement) ayant un
+  // besoin en électricité, chacun compté une seule fois (zone retenue). Les
+  // exposants dont AUCUN emplacement n'est dans une zone vont dans « Hors zone ».
+  function calculerZonesElectriques(ev) {
+    var zones = zonesDeLEvenement(ev);
+    var zonesCodes = zones.map(function (z) {
+      var s = {};
+      (z.emplacements || []).forEach(function (c) { s[normaliserCode(c)] = true; });
+      return s;
+    });
+    var resultats = zones.map(function (z, i) {
+      return { nom: z.nom || ("Zone " + (i + 1)), couleur: PALETTE_ZONES[i % PALETTE_ZONES.length],
+               kw: 0, nb: 0, sansPuissance: 0, codes: z.emplacements || [] };
+    });
+    var hors = { nom: "Hors zone", couleur: COULEUR_HORS_ZONE, kw: 0, nb: 0, sansPuissance: 0, codes: [] };
+    getParticipationsEvenement(ev.id).forEach(function (l) {
+      if (!l.exposant.besoin_electricite) return;
+      var codes = (l.participation.emplacements || "").split(",").map(normaliserCode).filter(Boolean);
+      if (!codes.length) return;
+      var kw = parseFloat(l.exposant.puissance_kw);
+      if (isNaN(kw)) kw = 0;
+      var rang = zoneRetenuePourExposant(codes, zonesCodes);
+      var cible = rang === null ? hors : resultats[rang];
+      cible.kw += kw;
+      cible.nb += 1;
+      if (!(kw > 0)) cible.sansPuissance += 1;
+      if (rang === null) hors.codes = hors.codes.concat(codes);
+    });
+    return { zones: resultats, horsZone: hors };
+  }
+
+  function htmlRectangleZone(z, libelleEmplacements) {
+    return '<div class="zone-rect" style="background:#' + z.couleur + '">' +
+      '<div class="zr-nom">' + escHtml(z.nom) + "</div>" +
+      '<div class="zr-kw">' + escHtml(formaterKw(z.kw)) + " <span>kW</span></div>" +
+      '<div class="zr-nb">' + z.nb + " exposant" + (z.nb > 1 ? "s" : "") + "</div>" +
+      (z.sansPuissance
+        ? '<div class="zr-alerte">⚠ ' + z.sansPuissance + " sans puissance renseignée</div>" : "") +
+      '<div class="zr-emp"><b>' + libelleEmplacements + "</b>" +
+        escHtml(condenserListeCodes(z.codes) || "—") + "</div>" +
+      "</div>";
+  }
+
+  function rendreZonesElectriques() {
+    var ev = evenementActif();
+    var conteneur = $("zones-content");
+    if (!ev) { conteneur.innerHTML = ""; return; }
+    var calcul = calculerZonesElectriques(ev);
+    if (!calcul.zones.length) {
+      conteneur.innerHTML = '<div class="empty-state"><span class="emoji">⚡</span>' +
+        "Aucune zone électrique n'est définie pour cet événement.<br><br>" +
+        "Définissez-les dans Ymarché (bouton « ⚡ Zones électriques… » de l'événement), " +
+        "puis exportez à nouveau la sauvegarde.</div>";
+      return;
+    }
+    var total = calcul.zones.reduce(function (s, z) { return s + z.kw; }, 0);
+    var html = '<div class="zones-total"><div class="grand">Total des zones : <b>' +
+      escHtml(formaterKw(total)) + " kW</b></div>" +
+      '<div class="sous">Exposants attendus à cet événement — chacun compté une seule fois</div></div>';
+    html += '<div class="zones-grid">' +
+      calcul.zones.map(function (z) { return htmlRectangleZone(z, "Emplacements"); }).join("") +
+      (calcul.horsZone.nb ? htmlRectangleZone(calcul.horsZone, "Emplacements concernés") : "") +
+      "</div>";
+    if (calcul.horsZone.nb) {
+      html += '<p class="footer-note">« Hors zone » : exposants ayant un besoin en électricité mais dont ' +
+        "aucun emplacement n'appartient à une zone.</p>";
+    }
+    conteneur.innerHTML = html;
+  }
+
   // ------------------------------------------------------------ navigation
   function afficherEcran(id) {
     document.querySelectorAll(".screen").forEach(function (s) { s.classList.remove("active"); });
@@ -453,6 +719,9 @@
     } else if (id === "screen-listing") {
       $("header-title").textContent = ev ? ev.nom : "Listing";
       $("header-subtitle").textContent = ev ? (formatDateFr(ev.date_evenement) + (ev.lieu ? " — " + ev.lieu : "")) : "";
+    } else if (id === "screen-zones") {
+      $("header-title").textContent = "Zones électriques";
+      $("header-subtitle").textContent = ev ? (ev.nom + " — " + formatDateFr(ev.date_evenement)) : "";
     } else if (id === "screen-fiche") {
       var exp = getExposant(ficheExposantId);
       $("header-title").textContent = exp ? exp.entreprise : "Fiche exposant";
@@ -571,6 +840,12 @@
     rendreListing();
   });
 
+  $("btn-goto-zones").addEventListener("click", function () {
+    if (evenementActifId == null) { toast("Choisissez un événement."); return; }
+    allerA("screen-zones");
+    rendreZonesElectriques();
+  });
+
   $("btn-send-report").addEventListener("click", envoyerRapport);
   $("btn-copy-report").addEventListener("click", copierRapport);
 
@@ -663,7 +938,7 @@
 
     var besoins = [];
     if (exp.besoin_eau) besoins.push("💧 Eau");
-    if (exp.besoin_electricite) besoins.push("⚡ Élec" + (exp.puissance_kw ? " (" + exp.puissance_kw + " kW)" : ""));
+    if (exp.besoin_electricite) besoins.push("⚡ Élec" + (parseFloat(exp.puissance_kw) > 0 ? " — " + formaterKw(parseFloat(exp.puissance_kw)) + " kW" : ""));
     if (exp.besoin_tonnelle) besoins.push("⛺ Tonnelle");
     if (exp.besoin_frigo) besoins.push("🧊 Frigo");
     if (exp.besoin_autre) besoins.push("✱ " + (exp.besoin_autre_texte || "Autre"));
@@ -691,12 +966,15 @@
     if (exp.siret) html += infoRow("SIRET", exp.siret);
     html += infoRow("Assurance", exp.assurance_recue ? "✓ Reçue" : "⚠ Non reçue");
     html += infoRow("Kbis", exp.kbis_recu ? "✓ Reçu" : "⚠ Non reçu");
+    html += infoRow("Règlement intérieur", exp.reglement_recu ? "✓ Reçu" : "⚠ Non reçu");
     html += "</div>";
 
     if (besoins.length) {
       html += '<div class="card"><h2>Besoins techniques</h2><div class="besoins-chips">' +
         besoins.map(function (b) { return '<span class="chip">' + escHtml(b) + "</span>"; }).join("") +
-        "</div></div>";
+        "</div>" +
+        (exp.besoin_electricite ? htmlBlocElectrique(exp, ligne && ligne.participation) : "") +
+        "</div>";
     }
 
     if (contacts.length) {
