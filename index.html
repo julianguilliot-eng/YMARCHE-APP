@@ -196,6 +196,10 @@
   .zone-rect .zr-nom { font-weight: 800; font-size: 15px; color: var(--navy); }
   .zone-rect .zr-kw { font-size: 30px; font-weight: 800; line-height: 1.1; margin-top: 6px; color: var(--navy); }
   .zone-rect .zr-kw span { font-size: 16px; font-weight: 700; }
+  .zone-rect .zr-kw.niveau-vert { color: #1B8A3C; }
+  .zone-rect .zr-kw.niveau-orange { color: #E08A00; }
+  .zone-rect .zr-kw.niveau-rouge { color: #D93025; }
+  .zone-rect .zr-disjoncteur { font-size: 11px; color: rgba(42,38,34,.65); margin-top: 1px; }
   .zone-rect .zr-nb { font-size: 12.5px; margin-top: 2px; color: rgba(42,38,34,.75); }
   .zone-rect .zr-alerte { font-size: 12px; margin-top: 6px; color: var(--red); font-weight: 600; line-height: 1.3; }
   .zone-rect .zr-emp {
@@ -474,6 +478,33 @@
   // Couleurs : identiques à celles du plan électrique imprimé.
   var PALETTE_ZONES = ["F4A6A6", "F9CB8B", "F6E58D", "A9DFA0", "8FD8D0", "9EC5F8", "C3A8F0", "F2A9D4", "D5BE9B", "B7C4CE"];
   var COULEUR_HORS_ZONE = "D9D9D9";
+
+  // Disjoncteur de tête d'une zone : puissance maximale admissible et niveau de
+  // charge (vert / orange / rouge) -- mêmes formules et mêmes seuils que le
+  // logiciel Ymarché (voir emplacements_utils.py : norme NF C15-100, cos phi
+  // classique de 0,8).
+  var COS_PHI_STANDARD = 0.8;
+  var TENSION_TRIPHASEE = 400;
+  var TENSION_MONOPHASEE = 230;
+  var AMPERAGE_ZONE_PAR_DEFAUT = 63;
+  var PHASE_ZONE_PAR_DEFAUT = "tri";
+  var SEUIL_NIVEAU_ORANGE = 0.70;
+  var SEUIL_NIVEAU_ROUGE = 1.00;
+
+  function puissanceMaxZone(amperage, phase) {
+    amperage = parseFloat(amperage);
+    if (!amperage || amperage <= 0) return 0;
+    if (phase === "mono") return TENSION_MONOPHASEE * amperage * COS_PHI_STANDARD / 1000;
+    return TENSION_TRIPHASEE * amperage * Math.sqrt(3) * COS_PHI_STANDARD / 1000;
+  }
+
+  function niveauChargeZone(kw, puissanceMax) {
+    if (!puissanceMax || puissanceMax <= 0) return null;
+    var ratio = (kw || 0) / puissanceMax;
+    if (ratio >= SEUIL_NIVEAU_ROUGE) return "rouge";
+    if (ratio >= SEUIL_NIVEAU_ORANGE) return "orange";
+    return "vert";
+  }
   var FRACTION_RE = /^(\d+)([A-Za-z])$/;
 
   function normaliserCode(c) { return String(c == null ? "" : c).trim().toUpperCase(); }
@@ -629,8 +660,12 @@
       return s;
     });
     var resultats = zones.map(function (z, i) {
+      var amperage = z.amperage || AMPERAGE_ZONE_PAR_DEFAUT;
+      var phase = z.phase || PHASE_ZONE_PAR_DEFAUT;
+      var pMax = puissanceMaxZone(amperage, phase);
       return { nom: z.nom || ("Zone " + (i + 1)), couleur: PALETTE_ZONES[i % PALETTE_ZONES.length],
-               kw: 0, nb: 0, sansPuissance: 0, codes: z.emplacements || [] };
+               kw: 0, nb: 0, sansPuissance: 0, codes: z.emplacements || [],
+               amperage: amperage, phase: phase, puissanceMax: pMax };
     });
     var hors = { nom: "Hors zone", couleur: COULEUR_HORS_ZONE, kw: 0, nb: 0, sansPuissance: 0, codes: [] };
     getParticipationsEvenement(ev.id).forEach(function (l) {
@@ -650,9 +685,16 @@
   }
 
   function htmlRectangleZone(z, libelleEmplacements) {
+    var niveau = z.puissanceMax ? niveauChargeZone(z.kw, z.puissanceMax) : null;
+    var pourcentage = z.puissanceMax ? " (" + Math.round(z.kw / z.puissanceMax * 100) + "%)" : "";
+    var disjoncteur = z.amperage
+      ? '<div class="zr-disjoncteur">Disjoncteur : ' + (z.phase === "mono" ? "mono" : "tri") + " " +
+        escHtml(String(z.amperage)) + " A</div>" : "";
     return '<div class="zone-rect" style="background:#' + z.couleur + '">' +
       '<div class="zr-nom">' + escHtml(z.nom) + "</div>" +
-      '<div class="zr-kw">' + escHtml(formaterKw(z.kw)) + " <span>kW</span></div>" +
+      '<div class="zr-kw' + (niveau ? " niveau-" + niveau : "") + '">' + escHtml(formaterKw(z.kw)) +
+        " <span>kW" + escHtml(pourcentage) + "</span></div>" +
+      disjoncteur +
       '<div class="zr-nb">' + z.nb + " exposant" + (z.nb > 1 ? "s" : "") + "</div>" +
       (z.sansPuissance
         ? '<div class="zr-alerte">⚠ ' + z.sansPuissance + " sans puissance renseignée</div>" : "") +
