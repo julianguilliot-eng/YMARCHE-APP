@@ -256,6 +256,7 @@
         <button class="btn btn-navy" id="btn-goto-zones">⚡ Zones électriques</button>
         <button class="btn btn-navy" id="btn-send-report">✉️ Envoyer le rapport de présence par e-mail</button>
         <button class="btn btn-ghost" id="btn-copy-report">📋 Copier le texte du rapport</button>
+        <button class="btn btn-ghost" id="btn-download-recap">📎 Télécharger le fichier de présences (.txt)</button>
         <button class="btn btn-ghost" id="btn-reload-file">📂 Charger une autre sauvegarde</button>
         <button class="btn btn-ghost" id="btn-reset" style="color: var(--red);">🗑 Effacer la sauvegarde en cours</button>
       </div>
@@ -889,6 +890,7 @@
   });
 
   $("btn-send-report").addEventListener("click", envoyerRapport);
+  $("btn-download-recap").addEventListener("click", telechargerRecapPresences);
   $("btn-copy-report").addEventListener("click", copierRapport);
 
   // ------------------------------------------------------------ presence (etat)
@@ -1086,6 +1088,45 @@
     var lien = "mailto:" + encodeURIComponent(ADRESSE_MAIL_RAPPORT) +
       "?subject=" + encodeURIComponent(rapport.sujet) + "&body=" + encodeURIComponent(rapport.corps);
     window.location.href = lien;
+  }
+
+  // Fichier de présences (.txt), au format lu par le logiciel Ymarché : une
+  // fois réimporté (bouton dédié dans l'onglet Planning des exposants), il
+  // marque automatiquement, pour CET événement précis, qui est réellement
+  // venu et qui était prévu mais absent -- sans toucher aux autres
+  // événements. Un mailto: ne permet pas de joindre un fichier
+  // automatiquement (limite du navigateur) : ce bouton le télécharge pour
+  // le joindre à la main au message.
+  function construireRecapPresencesTexte() {
+    var ev = donnees.evenements.find(function (e) { return e.id === evenementActifId; });
+    var lignes = getParticipationsEvenement(evenementActifId);
+    var texte = "# YMARCHE RECAP PRESENCES\n";
+    texte += "EVENEMENT_ID=" + ev.id + "\n";
+    texte += "EVENEMENT_NOM=" + ev.nom + "\n";
+    texte += "EVENEMENT_DATE=" + (ev.date_evenement || "") + "\n";
+    texte += "#PRESENCES\n";
+    texte += "ENTREPRISE;VENU\n";
+    lignes.forEach(function (l) {
+      var venu = estPresent(l.exposant.id) ? 1 : 0;
+      texte += (l.exposant.entreprise || "").replace(/;/g, ",") + ";" + venu + "\n";
+    });
+    return texte;
+  }
+
+  function telechargerRecapPresences() {
+    if (evenementActifId == null) { toast("Choisissez un événement."); return; }
+    var ev = donnees.evenements.find(function (e) { return e.id === evenementActifId; });
+    var texte = construireRecapPresencesTexte();
+    var blob = new Blob([texte], { type: "text/plain;charset=utf-8" });
+    var lien = document.createElement("a");
+    var nomFichier = "Recap_presences_" + (ev.nom || "evenement").replace(/[^A-Za-z0-9_-]+/g, "_") + ".txt";
+    lien.href = URL.createObjectURL(blob);
+    lien.download = nomFichier;
+    document.body.appendChild(lien);
+    lien.click();
+    document.body.removeChild(lien);
+    setTimeout(function () { URL.revokeObjectURL(lien.href); }, 2000);
+    toast("Fichier téléchargé : joignez-le manuellement au mail (un lien mailto: ne peut pas le faire automatiquement).");
   }
 
   function copierRapport() {
