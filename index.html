@@ -256,6 +256,7 @@
         <button class="btn btn-navy" id="btn-goto-zones">⚡ Zones électriques</button>
         <button class="btn btn-navy" id="btn-send-report">✉️ Envoyer le rapport de présence par e-mail</button>
         <button class="btn btn-ghost" id="btn-copy-report">📋 Copier le texte du rapport</button>
+        <button class="btn btn-navy" id="btn-share-recap">📤 Partager le récap (avec le fichier joint)</button>
         <button class="btn btn-ghost" id="btn-download-recap">📎 Télécharger le fichier de présences (.txt)</button>
         <button class="btn btn-ghost" id="btn-reload-file">📂 Charger une autre sauvegarde</button>
         <button class="btn btn-ghost" id="btn-reset" style="color: var(--red);">🗑 Effacer la sauvegarde en cours</button>
@@ -891,6 +892,7 @@
 
   $("btn-send-report").addEventListener("click", envoyerRapport);
   $("btn-download-recap").addEventListener("click", telechargerRecapPresences);
+  $("btn-share-recap").addEventListener("click", partagerRecapPresences);
   $("btn-copy-report").addEventListener("click", copierRapport);
 
   // ------------------------------------------------------------ presence (etat)
@@ -1111,6 +1113,53 @@
       texte += (l.exposant.entreprise || "").replace(/;/g, ",") + ";" + venu + "\n";
     });
     return texte;
+  }
+
+  // Partage natif (Web Share API, niveau 2 : fichiers) : sur téléphone,
+  // ouvre le sélecteur d'applications du système (Mail, Gmail, Outlook,
+  // WhatsApp...) avec le fichier de présences DÉJÀ JOINT -- contrairement à
+  // un lien mailto:, qui ne peut jamais joindre de fichier (restriction du
+  // navigateur, pas contournable). Disponible sur la plupart des téléphones
+  // récents (Android/Chrome, iPhone/Safari 15+), mais pas sur tous les
+  // navigateurs ni sur ordinateur : on retombe alors sur le téléchargement
+  // manuel, seule méthode universelle.
+  async function partagerRecapPresences() {
+    if (evenementActifId == null) { toast("Choisissez un événement."); return; }
+    var ev = donnees.evenements.find(function (e) { return e.id === evenementActifId; });
+    var texte = construireRecapPresencesTexte();
+    var nomFichier = "Recap_presences_" + (ev.nom || "evenement").replace(/[^A-Za-z0-9_-]+/g, "_") + ".txt";
+    var fichier;
+    try {
+      fichier = new File([texte], nomFichier, { type: "text/plain" });
+    } catch (e) {
+      telechargerRecapPresences();
+      return;
+    }
+    var supporte = false;
+    try {
+      supporte = !!(navigator.canShare && navigator.share && navigator.canShare({ files: [fichier] }));
+    } catch (e) {
+      supporte = false;
+    }
+    if (!supporte) {
+      toast("Le partage direct n'est pas disponible sur cet appareil/navigateur : téléchargement à la place.");
+      telechargerRecapPresences();
+      return;
+    }
+    try {
+      await navigator.share({
+        files: [fichier],
+        title: "Récap de présences — " + ev.nom,
+        text: "Récap de présences — " + ev.nom + " (" + formatDateFr(ev.date_evenement) + ").\n" +
+              "À joindre au mail : le logiciel Ymarché le reconnaît automatiquement.",
+      });
+    } catch (e) {
+      // AbortError = l'utilisateur a simplement annulé le partage : rien à signaler.
+      if (e && e.name !== "AbortError") {
+        toast("Le partage a échoué : téléchargement à la place.");
+        telechargerRecapPresences();
+      }
+    }
   }
 
   function telechargerRecapPresences() {
